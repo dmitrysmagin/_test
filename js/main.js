@@ -140,7 +140,7 @@ video {
 }
 
 //customElements.define('screen-sharing', ScreenSharing);
-
+/*
 let ScreenRecorder = new ScreenSharing();
 UpdateButtons();
 
@@ -162,3 +162,4 @@ function btnStopClicked() {
 function btnDownloadClicked() {
 	ScreenRecorder._downloadRecording(0);
 }
+*/
