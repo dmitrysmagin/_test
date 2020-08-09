@@ -6,160 +6,147 @@
  *  tree.
  */
 'use strict';
-//import {LitElement, html} from 'https://unpkg.com/@polymer/lit-element@0.6.2/lit-element.js?module';
 
-class ScreenSharing /*extends LitElement*/ {
-  constructor() {
-    //super();
-    this.enableStartCapture = true;
-    this.enableStopCapture = false;
-    this.enableDownloadRecording = false;
-    this.stream = null;
-    this.chunks = [];
-    this.mediaRecorder = null;
-    this.status = 'Inactive';
-    this.recording = null;
-  }
-/*
-  static get properties() {
-    return {
-      status: String,
-      enableStartCapture: Boolean,
-      enableStopCapture: Boolean,
-      enableDownloadRecording: Boolean,
-      recording: {
-        type: {
-          fromAttribute: input => input
+// Blob or File to DataUrl
+function readAsDataURL(blob) {
+    return new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onerror = reject;
+        fr.onload = function() {
+            resolve(fr.result);
         }
-      }
-    };
-  }
-
-  render() {
-    return html`<style>
-@import "../../../css/main.css";
-:host {
-  display: block;
-  padding: 10px;
-  width: 100%;
-  height: 100%;
-}
-video {
-    --video-width: 100%;
-    width: var(--video-width);
-    height: calc(var(--video-width) * (16 / 9));
-}
-</style>
-<video ?controls="${this.recording !== null}" playsinline autoplay loop muted .src="${this.recording}"></video>
-<div>
-<p>Status: ${this.status}</p>
-<button ?disabled="${!this.enableStartCapture}" @click="${e => this._startCapturing(e)}">Start screen capture</button>
-<button ?disabled="${!this.enableStopCapture}" @click="${e => this._stopCapturing(e)}">Stop screen capture</button>
-<button ?disabled="${!this.enableDownloadRecording}" @click="${e => this._downloadRecording(e)}">Download recording</button>
-<a id="downloadLink" type="video/webm" style="display: none"></a>
-</div>`;
-  }
-*/
-  static _startScreenCapture() {
-    if (navigator.getDisplayMedia) {
-      return navigator.getDisplayMedia({video: true});
-    } else if (navigator.mediaDevices.getDisplayMedia) {
-      return navigator.mediaDevices.getDisplayMedia({video: true});
-    } else {
-      return navigator.mediaDevices.getUserMedia({video: {mediaSource: 'screen'}});
-    }
-  }
-
-  async _startCapturing(e) {
-	  console.log(this);
-    console.log('Start capturing.');
-    this.status = 'Screen recording started.';
-    this.enableStartCapture = false;
-    this.enableStopCapture = true;
-    this.enableDownloadRecording = false;
-    //this.requestUpdate('buttons');
-
-    if (this.recording) {
-      window.URL.revokeObjectURL(this.recording);
-    }
-
-    this.chunks = [];
-    this.recording = null;
-    this.stream = await ScreenSharing._startScreenCapture();
-    this.stream.addEventListener('inactive', e => {
-      console.log('Capture stream inactive - stop recording!');
-      //this._stopCapturing(e);
+        fr.readAsDataURL(blob);
     });
-    this.mediaRecorder = new MediaRecorder(this.stream, {mimeType: 'video/webm'});
-    this.mediaRecorder.addEventListener('dataavailable', event => {
-		console.log('test');
-      if (event.data && event.data.size > 0) {
-        this.chunks.push(event.data);
-      }
+}
+
+// Blob or File to ArrayBuffer
+function readAsArrayBuffer(blob) {
+    return new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onerror = reject;
+        fr.onload = function() {
+            resolve(fr.result);
+        }
+        fr.readAsArrayBuffer(blob);
     });
-    this.mediaRecorder.start(10);
-
-	var videoWindow = document.getElementById('videoWindow');
-	videoWindow.disabled = true;
-	videoWindow.src = '';
-  }
-
-   async _stopCapturing(e) {
-	console.log(this);
-    console.log('Stop capturing.');
-    this.status = 'Screen recording completed.';
-    this.enableStartCapture = true;
-    this.enableStopCapture = false;
-    this.enableDownloadRecording = true;
-
-    await this.mediaRecorder.stop();
-    this.mediaRecorder = null;
-
-    this.stream.getTracks().forEach(track => track.stop());
-    this.stream = null;
-
-    this.recording = window.URL.createObjectURL(new Blob(this.chunks, {type: 'video/webm'}));
-
-	var videoWindow = document.getElementById('videoWindow');
-	videoWindow.disabled = false;
-	videoWindow.src = this.recording;
-  }
-
-  _downloadRecording(e) {
-    console.log('Download recording.');
-    this.enableStartCapture = true;
-    this.enableStopCapture = false;
-    this.enableDownloadRecording = false;
-
-    const downloadLink = document.querySelector('a#downloadLink');
-    downloadLink.addEventListener('progress', e => console.log(e));
-    downloadLink.href = this.recording;
-    downloadLink.download = 'screen-recording.webm';
-    downloadLink.click();
-  }
 }
 
-//customElements.define('screen-sharing', ScreenSharing);
-/*
-let ScreenRecorder = new ScreenSharing();
-UpdateButtons();
+class ScreenSharing {
+	constructor() {
+		this.enableStartCapture = true;
+		this.enableStopCapture = false;
+		this.enableDownloadRecording = false;
+		this.stream = null;
+		this.chunks = [];
+		this.mediaRecorder = null;
+		this.status = 'Inactive';
+		this.dataUrl = null;
+	}
 
-function UpdateButtons() {
-	document.getElementById('btnStart').disabled = !ScreenRecorder.enableStartCapture;
-	document.getElementById('btnStop').disabled = !ScreenRecorder.enableStopCapture;
-	document.getElementById('btnDownload').disabled = !ScreenRecorder.enableDownloadRecording;
-	document.getElementById('statusString').innerHTML = 'Status: ' + ScreenRecorder.status;
-}
+	static _startScreenCapture() {
+		if (navigator.getDisplayMedia) {
+			return navigator.getDisplayMedia({video: true});
+		} else if (navigator.mediaDevices.getDisplayMedia) {
+			return navigator.mediaDevices.getDisplayMedia({video: true});
+		} else {
+			return navigator.mediaDevices.getUserMedia({video: {mediaSource: 'screen'}});
+		}
+	}
 
-function btnStartClicked() {			
-	ScreenRecorder._startCapturing(0);
-	UpdateButtons();
+	async _startCapturing(e) {
+		console.log('Start capturing.');
+		this.status = 'Screen recording started.';
+		this.enableStartCapture = false;
+		this.enableStopCapture = true;
+		this.enableDownloadRecording = false;
+
+		if (this.dataUrl) {
+		  window.URL.revokeObjectURL(this.dataUrl);
+		}
+
+		this.chunks = [];
+		this.dataUrl = null;
+		this.stream = await ScreenSharing._startScreenCapture();
+		this.stream.addEventListener('inactive', e => {
+		  console.log('Capture stream inactive - stop recording!');
+		  //this._stopCapturing(e);
+		});
+		this.mediaRecorder = new MediaRecorder(this.stream, {mimeType: 'video/webm'});
+		this.mediaRecorder.addEventListener('dataavailable', event => {
+		  if (event.data && event.data.size > 0) {
+			this.chunks.push(event.data);
+		  }
+		});
+		this.mediaRecorder.start(10);
+
+		var videoWindow = document.getElementById('videoWindow');
+		videoWindow.disabled = true;
+		videoWindow.src = '';
+	}
+
+	async ChunksToDataUrl(_chunks) {
+		// create full copy to be sure chunks[] is not updated behind the scenes
+		const chunks = Object.assign([], _chunks);
+
+		let totalsize = 0;
+		let offset = 0;
+
+		for(const chunk of chunks)
+			totalsize += chunk.size;
+
+		const buffer = new ArrayBuffer(totalsize);
+		const view = new DataView(buffer);
+
+		// don't use forEach because 'await chunk.arrayBuffer()' doesn't work then
+		for (const chunk of chunks) {
+			let inputbuffer = await chunk.arrayBuffer();
+			//let inputbuffer = await readAsArrayBuffer(chunk);
+			let inputview = new DataView(inputbuffer);
+
+			for (var i = 0; i < chunk.size; i++) {
+				view.setUint8(offset + i, inputview.getUint8(i));
+			}
+			offset += chunk.size;
+		}
+
+		let blob = new Blob([view], {type: 'video/webm'});
+		let dataUrl = await readAsDataURL(blob);
+
+		return dataUrl;
+	}
+
+	async _stopCapturing(e) {
+		console.log('Stop capturing.');
+		this.status = 'Screen recording completed.';
+		this.enableStartCapture = true;
+		this.enableStopCapture = false;
+		this.enableDownloadRecording = true;
+
+		await this.mediaRecorder.stop();
+		this.mediaRecorder = null;
+
+		this.stream.getTracks().forEach(track => track.stop());
+		this.stream = null;
+
+		this.dataUrl = await this.ChunksToDataUrl(this.chunks);
+
+		console.log(this.dataUrl);
+
+		var videoWindow = document.getElementById('videoWindow');
+		videoWindow.disabled = false;
+		videoWindow.src = this.dataUrl;
+	}
+
+	_downloadRecording(e) {
+		console.log('Download recording.');
+		this.enableStartCapture = true;
+		this.enableStopCapture = false;
+		this.enableDownloadRecording = false;
+
+		const downloadLink = document.querySelector('a#downloadLink');
+		downloadLink.addEventListener('progress', e => console.log(e));
+		downloadLink.href = this.dataUrl;
+		downloadLink.download = 'screen-recording.webm';
+		downloadLink.click();
+	}
 }
-function btnStopClicked() {
-	ScreenRecorder._stopCapturing(0);
-	UpdateButtons();
-}
-function btnDownloadClicked() {
-	ScreenRecorder._downloadRecording(0);
-}
-*/
