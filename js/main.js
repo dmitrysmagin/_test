@@ -41,6 +41,7 @@ class ScreenSharing {
 		this.mediaRecorder = null;
 		this.status = 'Inactive';
 		this.dataUrl = null;
+		this.done = false;
 	}
 
 	static _startScreenCapture() {
@@ -54,11 +55,6 @@ class ScreenSharing {
 	}
 
 	async _startCapturing(e) {
-		console.log('Start capturing.');
-		this.status = 'Screen recording started.';
-		this.enableStartCapture = false;
-		this.enableStopCapture = true;
-		this.enableDownloadRecording = false;
 
 		if (this.dataUrl) {
 		  window.URL.revokeObjectURL(this.dataUrl);
@@ -66,27 +62,49 @@ class ScreenSharing {
 
 		this.chunks = [];
 		this.dataUrl = null;
-		this.stream = await ScreenSharing._startScreenCapture();
-		this.stream.addEventListener('inactive', e => {
-		  console.log('Capture stream inactive - stop recording!');
-		  //this._stopCapturing(e);
-		});
+		this.stream = null;
+
+		try {
+			this.stream = await ScreenSharing._startScreenCapture();
+		} catch (err) {
+			console.error(err);
+			return;
+		}
+
 		this.mediaRecorder = new MediaRecorder(this.stream, {mimeType: 'video/webm'});
 		this.mediaRecorder.addEventListener('dataavailable', event => {
 		  if (event.data && event.data.size > 0) {
 			this.chunks.push(event.data);
 		  }
 		});
+
+		// 'stop' event fires up after last 'dataavailable
+		this.mediaRecorder.addEventListener('stop', event => {
+			this.done = true;
+			console.log(this.chunks.length);
+		});
+
 		this.mediaRecorder.start(10);
+
+		console.log('Start capturing.');
+
+		this.status = 'Screen recording started.';
+		this.enableStartCapture = false;
+		this.enableStopCapture = true;
+		this.enableDownloadRecording = false;
+		this.done = false;
 
 		var videoWindow = document.getElementById('videoWindow');
 		videoWindow.disabled = true;
 		videoWindow.src = '';
 	}
 
-	async ChunksToDataUrl(_chunks) {
-		// create full copy to be sure chunks[] is not updated behind the scenes
-		const chunks = Object.assign([], _chunks);
+	async ChunksToDataUrl(chunks) {
+		// chunks still may be updated, so wait the 'stop' event
+		while (this.done === false)
+			await new Promise(resolve => setTimeout(resolve, 10));
+
+		console.log(chunks.length);
 
 		let totalsize = 0;
 		let offset = 0;
@@ -122,11 +140,11 @@ class ScreenSharing {
 		this.enableStopCapture = false;
 		this.enableDownloadRecording = true;
 
-		await this.mediaRecorder.stop();
-		this.mediaRecorder = null;
-
 		this.stream.getTracks().forEach(track => track.stop());
 		this.stream = null;
+
+		await this.mediaRecorder.stop();
+		this.mediaRecorder = null;
 
 		this.dataUrl = await this.ChunksToDataUrl(this.chunks);
 
